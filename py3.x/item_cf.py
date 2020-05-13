@@ -134,7 +134,7 @@ class ItemCF(object):
 
 
 if __name__ == '__main__':
-    ratingfile = "../../data/ratings"
+    ratingfile = "../data/ml-1m/ratings"
     item_cf = ItemCF()
     item_cf.generate_dataset(ratingfile)
     item_cf.calc_movie_sim()

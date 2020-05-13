@@ -1,11 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Sep 17 10:55:09 2018
-
-@author: ych
-
-E-mail:yao544303963@gmail.com
-"""
 
 import sys
 import random
@@ -46,6 +39,7 @@ class UserCF(object):
         for line in fp:
             user, movie, rating, _ = line.split('::')
             # split the data by pivot
+#            random.random()生成一个[0,1)的函数
             if random.random() < pivot:
                 self.trainset.setdefault(user, {})
                 self.trainset[user][movie] = int(rating)
@@ -100,7 +94,7 @@ class UserCF(object):
         print ('calculating user similarity matrix...', file=sys.stderr)
         simfactor_count = 0
         PRINT_STEP = 2000000
-
+#       计算用户之间的相似性
         for u, related_users in usersim_mat.items():
             for v, count in related_users.items():
                 usersim_mat[u][v] = count / math.sqrt(
@@ -124,6 +118,7 @@ class UserCF(object):
 
         for similar_user, similarity_factor in sorted(self.user_sim_mat[user].items(),
                                                       key=itemgetter(1), reverse=True)[0:K]:
+#            找到和当前用户最相似的前K个用户
             for movie in self.trainset[similar_user]:
                 if movie in watched_movies:
                     continue
@@ -170,7 +165,7 @@ class UserCF(object):
 
 
 if __name__ == '__main__':
-    ratingfile = "../../data/ratings"
+    ratingfile = "../data/ml-1m/ratings"
     usercf = UserCF()
     usercf.generate_dataset(ratingfile)
     usercf.calc_user_sim()
