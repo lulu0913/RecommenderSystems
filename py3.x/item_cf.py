@@ -90,8 +90,7 @@ class ItemCF(object):
         watched_movies = self.trainset[user]
 
         for movie, rating in watched_movies.items():
-            for related_movie, similarity_factor in sorted(self.movie_sim_mat[movie].items(), key=itemgetter(1),
-                                                           reverse=True)[0:K]:
+            for related_movie, similarity_factor in sorted(self.movie_sim_mat[movie].items(), key=itemgetter(1),reverse=True):
                 if related_movie in watched_movies:
                     continue
                 rank.setdefault(related_movie, 0)

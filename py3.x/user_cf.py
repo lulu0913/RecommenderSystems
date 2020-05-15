@@ -4,6 +4,8 @@ import sys
 import random
 import math
 import os
+import numpy as np
+import csv
 from operator import itemgetter
 
 
@@ -25,9 +27,6 @@ class UserCF(object):
         self.movie_count = 0
 
         print ('Similar user number = %d' % self.n_sim_user, file=sys.stderr)
-        print ('recommended movie number = %d' %
-               self.n_rec_movie, file=sys.stderr)
-
 
 
     def generate_dataset(self, filename, pivot=0.7):
@@ -49,7 +48,6 @@ class UserCF(object):
                 self.testset[user][movie] = int(rating)
                 testset_len += 1
 
-        print ('split training set and test set succ', file=sys.stderr)
         print ('train set = %s' % trainset_len, file=sys.stderr)
         print ('test set = %s' % testset_len, file=sys.stderr)
 
@@ -57,7 +55,7 @@ class UserCF(object):
         ''' calculate user similarity matrix '''
         # build inverse table for item-users
         # key=movieID, value=list of userIDs who have seen this movie
-        print ('building movie-users inverse table...', file=sys.stderr)
+#        print ('building movie-users inverse table...', file=sys.stderr)
         movie2users = dict()
 
         for user, movies in self.trainset.items():
@@ -70,7 +68,7 @@ class UserCF(object):
                 if movie not in self.movie_popular:
                     self.movie_popular[movie] = 0
                 self.movie_popular[movie] += 1
-        print ('build movie-users inverse table succ', file=sys.stderr)
+#        print ('build movie-users inverse table succ', file=sys.stderr)
 
         # save the total movie number, which will be used in evaluation
         self.movie_count = len(movie2users)
@@ -78,7 +76,7 @@ class UserCF(object):
 
         # count co-rated items between users
         usersim_mat = self.user_sim_mat
-        print ('building user co-rated movies matrix...', file=sys.stderr)
+#        print ('building user co-rated movies matrix...', file=sys.stderr)
 
         for movie, users in movie2users.items():
             for u in users:
@@ -88,10 +86,10 @@ class UserCF(object):
                     usersim_mat.setdefault(u, {})
                     usersim_mat[u].setdefault(v, 0)
                     usersim_mat[u][v] += 1
-        print ('build user co-rated movies matrix succ', file=sys.stderr)
+#        print ('build user co-rated movies matrix succ', file=sys.stderr)
 
         # calculate similarity matrix
-        print ('calculating user similarity matrix...', file=sys.stderr)
+#        print ('calculating user similarity matrix...', file=sys.stderr)
         simfactor_count = 0
         PRINT_STEP = 2000000
 #       计算用户之间的相似性
@@ -104,29 +102,38 @@ class UserCF(object):
                     print ('calculating user similarity factor(%d)' %
                            simfactor_count, file=sys.stderr)
 
-        print ('calculate user similarity matrix(similarity factor) succ',
-               file=sys.stderr)
+#        print ('calculate user similarity matrix(similarity factor) succ',
+#               file=sys.stderr)
         print ('Total similarity factor number = %d' %
                simfactor_count, file=sys.stderr)
 
-    def recommend(self, user):
+    def recommend(self, user, movie_pre, hit):
         ''' Find K similar users and recommend N movies. '''
         K = self.n_sim_user
-        N = self.n_rec_movie
+        N = 0
+        sim_count = 0.0
         rank = dict()
         watched_movies = self.trainset[user]
 
-        for similar_user, similarity_factor in sorted(self.user_sim_mat[user].items(),
-                                                      key=itemgetter(1), reverse=True)[0:K]:
+        for similar_user, similarity_factor in sorted(self.user_sim_mat[user].items(), key=itemgetter(1), reverse=True):
 #            找到和当前用户最相似的前K个用户
-            for movie in self.trainset[similar_user]:
-                if movie in watched_movies:
-                    continue
+            rank.setdefault(movie_pre, 0)
+            if movie_pre in watched_movies:
+                rank[movie_pre] = self.trainset[user][movie_pre]
+                continue
+            if movie_pre in self.trainset[similar_user]:
+
                 # predict the user's "interest" for each movie
-                rank.setdefault(movie, 0)
-                rank[movie] += similarity_factor
+                rank[movie_pre] += similarity_factor*self.trainset[similar_user][movie_pre]
+                sim_count += similarity_factor
+        
+        if sim_count:
+            rank[movie_pre] = rank[movie_pre]/sim_count
+        else:
+            N += 1
+            print('the new movie is %d' % hit, file=sys.stderr)
         # return the N best movies
-        return sorted(rank.items(), key=itemgetter(1), reverse=True)[0:N]
+        return rank[movie_pre]
 
     def evaluate(self):
         ''' print evaluation result: precision, recall, coverage and popularity '''
@@ -141,28 +148,34 @@ class UserCF(object):
         all_rec_movies = set()
         # varables for popularity
         popular_sum = 0
+        err = 0.0
 
-        for i, user in enumerate(self.trainset):
-            if i % 500 == 0:
-                print ('recommended for %d users' % i, file=sys.stderr)
-            test_movies = self.testset.get(user, {})
-            rec_movies = self.recommend(user)
-            for movie, _ in rec_movies:
-                if movie in test_movies:
-                    hit += 1
-                all_rec_movies.add(movie)
-                popular_sum += math.log(1 + self.movie_popular[movie])
-            rec_count += N
-            test_count += len(test_movies)
+#        for i, user in enumerate(self.testset):
+        for user, test_movies in self.testset.items():
+#            if i % 500 == 0:
+#                print ('recommended for %d users' % i, file=sys.stderr)
+#            test_movies = self.testset.get(user, {})
+            for movie in test_movies:
+                movie_pre_rank = self.recommend(user, movie, hit)
+                print(hit)
+                hit+=1
+                movie_rank = self.testset[user][movie]
+                err += np.power(movie_pre_rank-movie_rank, 2)
+                test_count += 1
+#                all_rec_movies.add(movie)
+#                popular_sum += math.log(1 + self.movie_popular[movie])
+#            rec_count += N
+#            test_count += len(test_movies)
+#
+#        precision = hit / (1.0 * rec_count)
+#        recall = hit / (1.0 * test_count)
+#        coverage = len(all_rec_movies) / (1.0 * self.movie_count)
+#        popularity = popular_sum / (1.0 * rec_count)
+        rmse = np.sqrt(err/test_count)
 
-        precision = hit / (1.0 * rec_count)
-        recall = hit / (1.0 * test_count)
-        coverage = len(all_rec_movies) / (1.0 * self.movie_count)
-        popularity = popular_sum / (1.0 * rec_count)
-
-        print ('precision=%.4f\trecall=%.4f\tcoverage=%.4f\tpopularity=%.4f' %
-               (precision, recall, coverage, popularity), file=sys.stderr)
-
+#        print ('precision=%.4f\trecall=%.4f\tcoverage=%.4f\tpopularity=%.4f' %
+#               (precision, recall, coverage, popularity), file=sys.stderr)
+        print ('the totle RMSE is = %.6f' % rmse, file=sys.stderr)
 
 if __name__ == '__main__':
     ratingfile = "../data/ml-1m/ratings"
