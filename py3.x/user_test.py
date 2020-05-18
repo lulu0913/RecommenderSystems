@@ -19,7 +19,7 @@ class UserCF(object):
         self.trainset = {}
         self.testset = {}
 
-        self.n_sim_user = 20
+        self.n_sim_user = 900
         self.n_rec_movie = 10
 
         self.user_sim_mat = {}
@@ -35,8 +35,8 @@ class UserCF(object):
         testset_len = 0
 
         fp = open(filename, 'r')
-        for line in fp:
-            user, movie, rating, _ = line.split('::')
+        for line in fp.readlines():
+            user, movie, rating, _ =line.split('\t')
             # split the data by pivot
 #            random.random()生成一个[0,1)的函数
             if random.random() < pivot:
@@ -115,7 +115,7 @@ class UserCF(object):
         rank = dict()
         watched_movies = self.trainset[user]
 
-        for similar_user, similarity_factor in sorted(self.user_sim_mat[user].items(), key=itemgetter(1), reverse=True):
+        for similar_user, similarity_factor in sorted(self.user_sim_mat[user].items(), key=itemgetter(1), reverse=True)[0:K]:
 #            找到和当前用户最相似的前K个用户
             rank.setdefault(movie_pre, 0)
             if movie_pre in watched_movies:
@@ -131,7 +131,7 @@ class UserCF(object):
             rank[movie_pre] = rank[movie_pre]/sim_count
         else:
             N += 1
-            print('the new movie is %d' % hit, file=sys.stderr)
+#            print('the new movie is %d' % hit, file=sys.stderr)
         # return the N best movies
         return rank[movie_pre]
 
@@ -157,28 +157,17 @@ class UserCF(object):
 #            test_movies = self.testset.get(user, {})
             for movie in test_movies:
                 movie_pre_rank = self.recommend(user, movie, hit)
-                print(hit)
                 hit+=1
                 movie_rank = self.testset[user][movie]
                 err += np.power(movie_pre_rank-movie_rank, 2)
                 test_count += 1
-#                all_rec_movies.add(movie)
-#                popular_sum += math.log(1 + self.movie_popular[movie])
-#            rec_count += N
-#            test_count += len(test_movies)
-#
-#        precision = hit / (1.0 * rec_count)
-#        recall = hit / (1.0 * test_count)
-#        coverage = len(all_rec_movies) / (1.0 * self.movie_count)
-#        popularity = popular_sum / (1.0 * rec_count)
+
         rmse = np.sqrt(err/test_count)
 
-#        print ('precision=%.4f\trecall=%.4f\tcoverage=%.4f\tpopularity=%.4f' %
-#               (precision, recall, coverage, popularity), file=sys.stderr)
         print ('the totle RMSE is = %.6f' % rmse, file=sys.stderr)
 
 if __name__ == '__main__':
-    ratingfile = "../data/ml-1m/ratings"
+    ratingfile = "train.txt"
     usercf = UserCF()
     usercf.generate_dataset(ratingfile)
     usercf.calc_user_sim()
